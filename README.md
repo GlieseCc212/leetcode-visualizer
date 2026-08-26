@@ -2,6 +2,10 @@
 
 An interactive, stream-ready visualizer for learning linked-list pointer movement through two classic duplicate-removal problems.
 
+## Try it live
+
+[Open the interactive visualizer](https://gliesecc212.github.io/leetcode-visualizer/)
+
 ## Included problems
 
 - **LeetCode 83 — Remove Duplicates from Sorted List**: keep one copy of each value.
