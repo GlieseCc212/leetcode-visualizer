@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linked List Stream Simulator — LeetCode 82 & 83</title>
+  <style>
+    :root { --ink:#172033; --muted:#687085; --bg:#f5f7fb; --panel:#fff; --border:#e3e7ef; --blue:#2563eb; --violet:#7c3aed; --green:#047857; --red:#dc2626; --amber:#b45309; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { color:#fff; background:linear-gradient(120deg,#172554,#4c1d95); padding:26px max(24px,calc((100% - 1180px)/2)); }
+    h1 { font-size:clamp(24px,3vw,38px); margin:0 0 5px; letter-spacing:-.04em; }
+    header p { margin:0; color:#dbeafe; }
+    main { max-width:1180px; margin:24px auto 42px; padding:0 20px; }
+    .controls, .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; box-shadow:0 8px 24px #15254b0a; }
+    .controls { display:grid; grid-template-columns:210px 1fr auto; gap:14px; align-items:end; padding:18px; }
+    label { display:grid; gap:6px; color:#384259; font-size:13px; font-weight:700; }
+    select, input { width:100%; border:1px solid #cbd3e1; border-radius:9px; padding:11px 12px; color:var(--ink); font:inherit; background:white; }
+    .button-row { display:flex; gap:8px; flex-wrap:wrap; }
+    button { cursor:pointer; border:1px solid #cbd3e1; border-radius:9px; padding:10px 13px; color:#263149; background:#fff; font-weight:750; font:inherit; }
+    button.primary { border-color:var(--blue); color:#fff; background:var(--blue); }
+    button:hover { filter:brightness(.96); }
+    .error { min-height:23px; margin:10px 3px 0; color:var(--red); font-size:14px; }
+    .lesson { margin:14px 0 22px; padding:14px 17px; border-left:4px solid var(--violet); background:#f4f0ff; color:#40376b; border-radius:0 10px 10px 0; }
+    .grid { display:grid; grid-template-columns:1.2fr .8fr; gap:18px; }
+    .card { padding:20px; overflow:hidden; }
+    h2 { margin:0 0 4px; font-size:18px; letter-spacing:-.02em; }
+    .subtitle { color:var(--muted); margin:0 0 20px; font-size:14px; }
+    .stage { min-height:250px; display:flex; align-items:center; overflow-x:auto; padding:12px 5px 22px; }
+    .list { display:flex; align-items:center; min-width:max-content; gap:8px; padding:36px 12px 14px; }
+    .node-wrap { position:relative; display:flex; flex-direction:column; align-items:center; }
+    .node { width:56px; height:56px; display:grid; place-items:center; border:2px solid #9aa6bd; border-radius:12px; color:#202a40; background:#fff; font-weight:800; font-size:20px; transition:.25s ease; }
+    .node.current { border-color:var(--blue); box-shadow:0 0 0 5px #2563eb20; background:#eff6ff; }
+    .node.prev { border-color:var(--violet); box-shadow:0 0 0 5px #7c3aed20; background:#f5f3ff; }
+    .node.both { border-color:#9d174d; background:#fff1f2; }
+    .node.dummy { width:68px; font-size:14px; border-style:dashed; color:var(--violet); }
+    .pointer { position:absolute; top:-31px; white-space:nowrap; font-size:12px; font-weight:850; color:var(--blue); }
+    .pointer.prev-label { color:var(--violet); top:-50px; }
+    .pointer::after { content:"↓"; display:block; text-align:center; font-size:17px; line-height:13px; }
+    .arrow { color:#94a3b8; font-size:27px; font-weight:300; }
+    .empty { color:var(--muted); font-weight:650; padding:24px; }
+    .removed { display:flex; gap:8px; min-height:34px; align-items:center; color:var(--red); font-size:13px; font-weight:700; }
+    .removed .mini { border:1px solid #fecaca; color:var(--red); background:#fff1f2; border-radius:7px; padding:3px 8px; text-decoration:line-through; }
+    .step-meta { display:flex; justify-content:space-between; gap:10px; margin-top:14px; color:var(--muted); font-size:13px; font-weight:700; }
+    .progress { height:7px; border-radius:9px; overflow:hidden; margin-top:8px; background:#e7ebf2; }
+    .progress > div { height:100%; background:linear-gradient(90deg,var(--blue),var(--violet)); transition:width .2s; }
+    .explanation { margin-top:17px; padding:14px 15px; min-height:79px; border-radius:11px; background:#eff6ff; color:#1e3a8a; font-weight:650; }
+    .idea { margin-top:15px; border-top:1px solid var(--border); padding-top:15px; color:#3b465c; font-size:14px; }
+    .idea strong { color:var(--ink); }
+    .code { margin:0; overflow:auto; padding:14px 0; background:#101827; border-radius:12px; color:#d9e4f3; font:13px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; counter-reset:line; }
+    .code span { display:block; white-space:pre; padding:0 16px; }
+    .code span::before { counter-increment:line; content:counter(line); width:26px; display:inline-block; color:#64748b; user-select:none; }
+    .code .active { background:#1d4ed866; color:#fff; border-left:3px solid #60a5fa; padding-left:13px; }
+    .code .comment { color:#94a3b8; }
+    .talk-track { margin-top:18px; border-top:1px solid var(--border); padding-top:16px; }
+    .talk-track p { margin:7px 0 0; color:#3f4a60; }
+    .tip { margin-top:18px; padding:16px 18px; background:#fffdf3; border:1px solid #fde68a; border-radius:12px; color:#713f12; }
+    kbd { border:1px solid #d6dae3; border-bottom-width:2px; border-radius:5px; padding:1px 5px; color:#34415a; background:white; font:12px ui-monospace, monospace; }
+    @media (max-width:780px) { .controls,.grid { grid-template-columns:1fr; } .controls { align-items:stretch; } }
+  </style>
+</head>
+<body>
+  <header><h1>Linked List Stream Simulator</h1><p>Teach the pointer movement—not just the final Java answer.</p></header>
+  <main>
+    <section class="controls" aria-label="Simulator controls">
+      <label>Problem<select id="problem"><option value="83">83 — Keep one copy</option><option value="82">82 — Remove every duplicate</option></select></label>
+      <label>Sorted values (comma-separated)<input id="values" value="1, 1, 2, 3, 3" aria-label="Sorted list values"></label>
+      <div class="button-row"><button class="primary" id="build">Build example</button><button id="reset">Reset</button><button id="prev">← Back</button><button class="primary" id="next">Next step →</button><button id="play">▶ Play</button></div>
+    </section>
+    <div class="error" id="error" role="alert"></div>
+    <div class="lesson" id="lesson"></div>
+    <section class="grid">
+      <article class="card">
+        <h2>Live list and pointers</h2><p class="subtitle">Blue = <b>current</b> · Purple = <b>prev</b> · Dashed = <b>dummy</b></p>
+        <div class="stage"><div class="list" id="list"></div></div>
+        <div class="removed" id="removed"></div>
+        <div class="step-meta"><span id="step-name">Ready</span><span id="step-count"></span></div><div class="progress"><div id="bar"></div></div>
+        <div class="explanation" id="explanation"></div>
+        <div class="idea" id="idea"></div>
+      </article>
+      <article class="card">
+        <h2>Java code, synchronized</h2><p class="subtitle">The highlighted line is the action currently happening.</p>
+        <pre class="code" id="code" aria-label="Java code"></pre>
+        <div class="talk-track"><h2>What to say on stream</h2><p id="talk"></p></div>
+      </article>
+    </section>
+    <div class="tip"><strong>Stream tip:</strong> Ask chat to predict the next click first: “Will we move the pointer, skip one node, or remove a whole group?” Then press <kbd>Next step</kbd>.</div>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const code83 = [
+      'public ListNode deleteDuplicates(ListNode head) {',
+      '    ListNode current = head;',
+      '',
+      '    while (current != null && current.next != null) {',
+      '        if (current.val == current.next.val) {',
+      '            current.next = current.next.next;',
+      '        } else {',
+      '            current = current.next;',
+      '        }',
+      '    }',
+      '    return head;',
+      '}'
+    ];
+    const code82 = [
+      'public ListNode deleteDuplicates(ListNode head) {',
+      '    ListNode dummy = new ListNode(0);',
+      '    dummy.next = head;',
+      '    ListNode prev = dummy;',
+      '    ListNode current = head;',
+      '',
+      '    while (current != null) {',
+      '        if (current.next != null && current.val == current.next.val) {',
+      '            int duplicateValue = current.val;',
+      '            while (current != null && current.val == duplicateValue) {',
+      '                current = current.next;',
+      '            }',
+      '            prev.next = current;',
+      '        } else {',
+      '            prev = current;',
+      '            current = current.next;',
+      '        }',
+      '    }',
+      '    return dummy.next;',
+      '}'
+    ];
+    let steps = [], index = 0, playing = null;
+    const snapshot = (nodes, current, prev, line, title, text, removed = []) => ({ nodes:nodes.map(n=>({...n})), current, prev, line, title, text, removed });
+    function make83(values) {
+      let nodes = values.map((value,id)=>({value,id})), current = 0, out=[];
+      out.push(snapshot(nodes,current,null,2,'Start','Set <b>current</b> at the head. Because the input is sorted, matching values will always be adjacent.'));
+      while (current < nodes.length - 1) {
+        const a=nodes[current], b=nodes[current+1];
+        out.push(snapshot(nodes,current,null,5,'Compare neighbors',`Compare <b>${a.value}</b> with its next node <b>${b.value}</b>.`));
+        if (a.value === b.value) {
+          const gone=nodes.splice(current+1,1)[0];
+          out.push(snapshot(nodes,current,null,6,'Skip one duplicate',`The values match, so reconnect ${a.value} directly to the node after the duplicate. Keep <b>current</b> here—there could be another ${a.value}.`,[gone]));
+        } else {
+          current++;
+          out.push(snapshot(nodes,current,null,8,'Move forward',`The values differ. This ${a.value} is already correct, so move <b>current</b> to ${nodes[current].value}.`));
+        }
+      }
+      out.push(snapshot(nodes,null,null,11,'Complete','Every value now appears exactly once. Return the original head.'));
+      return out;
+    }
+    function make82(values) {
+      let nodes=values.map((value,id)=>({value,id})), current=0, prev='dummy', out=[];
+      out.push(snapshot(nodes,current,prev,4,'Set up dummy node','The <b>dummy</b> node sits before the head. It lets us remove duplicate values even when they begin at the first node.'));
+      while (current < nodes.length) {
+        const node=nodes[current], duplicate=current+1<nodes.length && node.value===nodes[current+1].value;
+        out.push(snapshot(nodes,current,prev,8,'Inspect a value',`Check whether ${node.value} begins a duplicate group.`));
+        if (duplicate) {
+          const value=node.value, start=current; while(current<nodes.length && nodes[current].value===value) current++;
+          const gone=nodes.splice(start,current-start); current=start;
+          out.push(snapshot(nodes,current,prev,13,'Remove the whole group',`${value} appeared ${gone.length} times. Unlike problem 83, we keep <b>none</b> of them. Connect <b>prev</b> to the first different value.`,gone));
+        } else {
+          prev=current; current++;
+          out.push(snapshot(nodes,current,prev,16,'Keep this unique node',`${node.value} appears once, so it belongs in the answer. Advance both pointers.`));
+        }
+      }
+      out.push(snapshot(nodes,null,prev,19,'Complete','All duplicate groups were removed. Return <b>dummy.next</b>, the real head of the answer.'));
+      return out;
+    }
+    function selectedProblem(){ return $('problem').value; }
+    function parse() {
+      const raw=$('values').value.trim(); if(!raw) throw new Error('Enter at least one integer.');
+      const values=raw.split(',').map(v=>v.trim()).map(v=>{if(!/^-?\d+$/.test(v)) throw new Error('Use comma-separated integers, for example: 1, 1, 2, 3.'); return Number(v);});
+      if(values.some((v,i)=>i && v<values[i-1])) throw new Error('This lesson requires a sorted linked list. Put values in ascending order.');
+      return values;
+    }
+    function rebuild() {
+      try { const values=parse(); $('error').textContent=''; index=0; clearInterval(playing); playing=null; steps=selectedProblem()==='83'?make83(values):make82(values); render(); }
+      catch(e) { $('error').textContent=e.message; }
+    }
+    function render() {
+      const step=steps[index]; if(!step) return; const p=selectedProblem();
+      $('lesson').innerHTML = p==='83' ? '<b>Problem 83:</b> Keep one node from each repeated value. The key operation is skipping only the extra node.' : '<b>Problem 82:</b> If a value repeats, remove its entire group. The dummy node avoids a special case at the head.';
+      const list=$('list'); list.innerHTML='';
+      const visual = p==='82' ? [{value:'dummy',id:'dummy',dummy:true},...step.nodes] : step.nodes;
+      if(!visual.length) list.innerHTML='<div class="empty">The resulting list is empty.</div>';
+      visual.forEach((n,i)=>{
+        const wrap=document.createElement('div'); wrap.className='node-wrap';
+        const node=document.createElement('div'); let classes='node'+(n.dummy?' dummy':'');
+        const currId=typeof step.current==='number'&&step.nodes[step.current]?.id; const prevId=step.prev==='dummy'?'dummy':(typeof step.prev==='number'&&step.nodes[step.prev]?.id);
+        if(n.id===currId) classes+=' current'; if(n.id===prevId) classes+=' prev'; if(n.id===currId&&n.id===prevId) classes+=' both'; node.className=classes; node.textContent=n.value;
+        if(n.id===currId){const tag=document.createElement('span');tag.className='pointer';tag.textContent='current';wrap.append(tag);}
+        if(n.id===prevId){const tag=document.createElement('span');tag.className='pointer prev-label';tag.textContent='prev';wrap.append(tag);}
+        wrap.append(node); list.append(wrap); if(i<visual.length-1){const arrow=document.createElement('span');arrow.className='arrow';arrow.textContent='→';list.append(arrow);}
+      });
+      $('removed').innerHTML=step.removed.length ? 'Removed: '+step.removed.map(n=>`<span class="mini">${n.value}</span>`).join('') : '';
+      $('step-name').textContent=step.title; $('step-count').textContent=`Step ${index+1} of ${steps.length}`; $('bar').style.width=`${((index+1)/steps.length)*100}%`;
+      $('explanation').innerHTML=step.text;
+      $('idea').innerHTML=p==='83'?'<strong>Why this works:</strong> sorted order makes every duplicate adjacent, so one pointer can solve it in one pass.':'<strong>Why this works:</strong> <b>prev</b> always marks the last confirmed unique node. It reconnects around an entire duplicate group.';
+      const lines=p==='83'?code83:code82; $('code').innerHTML=lines.map((line,i)=>`<span class="${i+1===step.line?'active':''} ${line.trim().startsWith('//')?'comment':''}">${escapeHtml(line)||' '}</span>`).join('');
+      $('talk').innerHTML = `<b>${step.title}:</b> ${stripHtml(step.text)}`;
+      $('prev').disabled=index===0; $('next').disabled=index===steps.length-1;
+    }
+    function escapeHtml(text){return text.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+    function stripHtml(text){const div=document.createElement('div');div.innerHTML=text;return div.textContent;}
+    $('build').onclick=rebuild; $('reset').onclick=()=>{index=0;clearInterval(playing);playing=null;render();}; $('prev').onclick=()=>{if(index>0){index--;render();}}; $('next').onclick=()=>{if(index<steps.length-1){index++;render();}};
+    $('problem').onchange=()=>{ $('values').value=selectedProblem()==='82'?'1, 2, 3, 3, 4, 4, 5':'1, 1, 2, 3, 3'; rebuild(); };
+    $('play').onclick=()=>{ if(playing){clearInterval(playing);playing=null;$('play').textContent='▶ Play';return;} $('play').textContent='❚❚ Pause'; playing=setInterval(()=>{if(index>=steps.length-1){clearInterval(playing);playing=null;$('play').textContent='▶ Play';}else{index++;render();}},1200); };
+    rebuild();
+  </script>
+</body>
+</html>
