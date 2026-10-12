@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlgoWorld — LeetCode 1011 Code-Driven Visualizer</title>
+    
+    <!-- CodeMirror for Java Code Editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/neo.min.css">
+    
+    <style>
+        :root {
+            --bg-main: #f0f3f8;
+            --panel-bg: rgba(255, 255, 255, 0.92);
+            --panel-border: rgba(210, 220, 235, 0.8);
+            --primary: #0066ff;
+            --primary-light: rgba(0, 102, 255, 0.12);
+            --text-dark: #121826;
+            --text-muted: #64748b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+        }
+
+        #app-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 3D Visualization Area */
+        #visualization-view {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            background: radial-gradient(circle at 50% 30%, #ffffff 0%, #e5ebf3 100%);
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* Java Code Editor Sidebar */
+        #code-sidebar {
+            width: 460px;
+            height: 100%;
+            background: #ffffff;
+            border-left: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.04);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #code-sidebar.hidden {
+            transform: translateX(100%);
+            position: absolute;
+            right: 0;
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-title .badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .CodeMirror {
+            height: 100% !important;
+            font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            background: #fafbfc;
+        }
+
+        /* Code Mirror Custom Active Line Highlight */
+        .cm-executed-line {
+            background-color: rgba(0, 102, 255, 0.15) !important;
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Live Variables Inspector Panel */
+        .variables-panel {
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-top: 1px solid var(--panel-border);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .var-card {
+            background: #ffffff;
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .var-name {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .var-value {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary);
+            font-family: monospace;
+            margin-top: 2px;
+        }
+
+        /* Floating Overlay Controls & HUD */
+        .overlay-hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 5;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .glass-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 12px 20px;
+            pointer-events: auto;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+        }
+
+        /* Streaming HUD Top Stats */
+        .stream-stats {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .stat-val.primary { color: var(--primary); }
+        .stat-val.success { color: var(--accent-green); }
+        .stat-val.danger { color: var(--accent-red); }
+
+        /* Binary Search Range Visualizer Bar */
+        .bs-visual-bar {
+            width: 100%;
+            max-width: 650px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .bs-track-container {
+            position: relative;
+            height: 28px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bs-track {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bs-active-segment {
+            position: absolute;
+            height: 100%;
+            background: rgba(0, 102, 255, 0.25);
+            border-top: 2px solid var(--primary);
+            border-bottom: 2px solid var(--primary);
+            transition: all 0.4s ease;
+        }
+
+        .bs-pin {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            color: white;
+            white-space: nowrap;
+            transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .bs-pin.left { background: #64748b; }
+        .bs-pin.right { background: #64748b; }
+        .bs-pin.mid { background: var(--primary); z-index: 2; transform: translate(-50%, -50%) scale(1.1); }
+
+        /* Bottom Execution Control Deck */
+        .control-deck {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 5;
+            pointer-events: auto;
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+        }
+
+        .btn {
+            background: #ffffff;
+            border: 1px solid var(--panel-border);
+            color: var(--text-dark);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .btn:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .btn.primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn.primary:hover {
+            background: #0052cc;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .speed-slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-left: 8px;
+            padding-left: 12px;
+            border-left: 1px solid var(--panel-border);
+        }
+
+        .speed-slider-group input {
+            width: 70px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Input Customizer Drawer */
+        .input-drawer {
+            position: absolute;
+            left: 20px;
+            bottom: 90px;
+            width: 320px;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .package-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        .chip {
+            background: #ffffff;
+            border: 1px solid var(--panel-border);
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chip-remove {
+            color: var(--accent-red);
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .chip-remove:hover { color: #dc2626; }
+
+        /* Stream Mode Toggle Button */
+        .stream-toggle-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 12;
+            pointer-events: auto;
+        }
+
+        /* Tooltip */
+        #tooltip {
+            position: absolute;
+            background: rgba(18, 24, 38, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            #code-sidebar { width: 380px; }
+        }
+    </style>
+
+    <!-- Three.js & Tween.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- 3D Visualization Canvas -->
+        <div id="visualization-view">
+            <div id="canvas-container"></div>
+
+            <!-- Top HUD -->
+            <div class="overlay-hud">
+                <div class="hud-row">
+                    <div class="glass-card stream-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Target Days (D)</span>
+                            <span class="stat-val" id="hud-days">5</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Current Mid / Cap</span>
+                            <span class="stat-val primary" id="hud-cap">15</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Days Required</span>
+                            <span class="stat-val" id="hud-days-used">1</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Package Load</span>
+                            <span class="stat-val" id="hud-load">0 / 15</span>
+                        </div>
+                    </div>
+
+                    <!-- Stream Mode Toggle -->
+                    <button class="btn glass-card stream-toggle-btn" id="btn-stream-mode">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M14 10l6-6M9 21H3v-6M10 14l-6 6"/></svg>
+                        <span id="stream-btn-text">Stream Mode</span>
+                    </button>
+                </div>
+
+                <!-- Binary Search Bounds Track -->
+                <div class="glass-card bs-visual-bar">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="stat-label">Binary Search Space [Left ... Right]</span>
+                        <span id="bs-status-text" style="font-size: 11px; font-weight: 700; color: var(--primary);">Initial Search</span>
+                    </div>
+                    <div class="bs-track-container">
+                        <div class="bs-track">
+                            <div class="bs-active-segment" id="bs-segment"></div>
+                        </div>
+                        <div class="bs-pin left" id="pin-left">L: 10</div>
+                        <div class="bs-pin mid" id="pin-mid">MID: 32</div>
+                        <div class="bs-pin right" id="pin-right">R: 55</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Controls Drawer -->
+            <div class="glass-card input-drawer" id="input-drawer">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="stat-label">Algorithm Inputs</span>
+                    <button class="btn" id="btn-add-pkg" style="padding: 2px 8px; font-size: 11px;">+ Package</button>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Days:</span>
+                    <input type="number" id="input-days" value="5" min="1" max="15" style="width: 50px; padding: 4px; border-radius: 6px; border: 1px solid var(--panel-border); font-weight: 700;">
+                </div>
+
+                <div class="package-chips" id="package-chips">
+                    <!-- Dynamic chips -->
+                </div>
+            </div>
+
+            <!-- Bottom Playback Controls Deck -->
+            <div class="control-deck">
+                <button class="btn" id="btn-reset" title="Reset Simulation">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    Reset
+                </button>
+                <button class="btn" id="btn-prev" title="Step Back">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                    Prev Line
+                </button>
+                <button class="btn primary" id="btn-play">
+                    <svg id="play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span id="play-text">Play</span>
+                </button>
+                <button class="btn" id="btn-next" title="Execute Next Line">
+                    Next Line
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                </button>
+                <button class="btn" id="btn-next-iter" title="Jump to Next Loop Iteration">
+                    Next Loop
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"/><polygon points="13 4 23 12 13 20 13 4"/></svg>
+                </button>
+
+                <div class="speed-slider-group">
+                    <span>Speed</span>
+                    <input type="range" id="speed-range" min="0.5" max="3" step="0.25" value="1">
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Sidebar -->
+        <div id="code-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    <span>Java Execution Engine</span>
+                    <span class="badge">LeetCode 1011</span>
+                </div>
+            </div>
+
+            <!-- CodeMirror Container -->
+            <div class="editor-wrapper">
+                <textarea id="java-code-editor"></textarea>
+            </div>
+
+            <!-- Live Variables State -->
+            <div class="variables-panel">
+                <div class="var-card">
+                    <span class="var-name">left</span>
+                    <span class="var-value" id="var-left">0</span>
+                </div>
+                <div class="var-card">
+                    <span class="var-name">right</span>
+                    <span class="var-value" id="var-right">0</span>
+                </div>
+                <div class="var-card">
+                    <span class="var-name">mid</span>
+                    <span class="var-value" id="var-mid">0</span>
+                </div>
+                <div class="var-card">
+                    <span class="var-name">daysUsed</span>
+                    <span class="var-value" id="var-daysUsed">1</span>
+                </div>
+                <div class="var-card">
+                    <span class="var-name">capacity</span>
+                    <span class="var-value" id="var-capacity">0</span>
+                </div>
+                <div class="var-card">
+                    <span class="var-name">weight</span>
+                    <span class="var-value" id="var-weight">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tooltip">Package #1: Weight 1</div>
+
+    <script>
+        // ====================================================================
+        // 1. JAVA SOURCE CODE DEFINITION & EDITOR SETUP
+        // ====================================================================
+        const JAVA_CODE = `class Solution {
+    public int shipWithinDays(int[] weights, int days) {
+        int left = 0;
+        int right = 0;
+
+        for (int weight : weights) {
+            left = Math.max(left, weight);
+            right += weight;
+        }
+
+        while (left < right) {
+            int mid = left + (right - left) / 2;
+
+            int daysUsed = 1;
+            int capacity = 0;
+
+            for (int weight : weights) {
+                if (capacity + weight > mid) {
+                    daysUsed++;
+                    capacity = 0;
+                }
+
+                capacity += weight;
+            }
+
+            if (daysUsed <= days) {
+                right = mid;
+            } else {
+                left = mid + 1;
+            }
+        }
+
+        return left;
+    }
+}`;
+
+        // Initialize CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('java-code-editor'), {
+            mode: 'text/x-java',
+            theme: 'neo',
+            lineNumbers: true,
+            readOnly: true,
+            viewportMargin: Infinity
+        });
+        editor.setValue(JAVA_CODE);
+
+        let activeLineHandle = null;
+        function highlightCodeLine(lineNumber) {
+            if (activeLineHandle !== null) {
+                editor.removeLineClass(activeLineHandle, 'background', 'cm-executed-line');
+            }
+            if (lineNumber > 0) {
+                activeLineHandle = editor.addLineClass(lineNumber - 1, 'background', 'cm-executed-line');
+                editor.scrollIntoView({ line: lineNumber - 1, ch: 0 }, 100);
+            }
+        }
+
+        // ====================================================================
+        // 2. FAITHFUL JAVA INTERPRETER & STEP-BY-STEP RECORDING ENGINE
+        // ====================================================================
+        let weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let targetDays = 5;
+
+        // Execution Step History
+        let executionSteps = [];
+        let currentStepIndex = 0;
+
+        function recordExecutionSteps(inputWeights, inputDays) {
+            const steps = [];
+            
+            // Program state variables
+            let left = 0;
+            let right = 0;
+            let mid = 0;
+            let daysUsed = 1;
+            let capacity = 0;
+            let currentWeight = 0;
+            let currentPkgIndex = -1;
+            let currentShipIndex = 0;
+            let shipLoads = [0];
+
+            function snap(line, action, extra = {}) {
+                steps.push({
+                    line,
+                    action,
+                    vars: { left, right, mid, daysUsed, capacity, currentWeight, currentPkgIndex, currentShipIndex },
+                    shipLoads: [...shipLoads],
+                    ...extra
+                });
+            }
+
+            // Entry point
+            snap(2, "INIT", { msg: "Initializing shipWithinDays" });
+            
+            left = 0;
+            snap(3, "VAR_INIT", { msg: "int left = 0;" });
+            
+            right = 0;
+            snap(4, "VAR_INIT", { msg: "int right = 0;" });
+
+            // Initial Bounds Loop
+            snap(6, "BOUNDS_LOOP_START", { msg: "Calculating search boundaries [max_weight, sum_weight]" });
+            for (let i = 0; i < inputWeights.length; i++) {
+                currentWeight = inputWeights[i];
+                currentPkgIndex = i;
+                snap(6, "BOUNDS_LOOP_ITER", { msg: `Inspecting package ${i+1} (weight ${currentWeight})` });
+
+                left = Math.max(left, currentWeight);
+                snap(7, "UPDATE_LEFT", { msg: `left = Math.max(left, ${currentWeight}) -> ${left}` });
+
+                right += currentWeight;
+                snap(8, "UPDATE_RIGHT", { msg: `right += ${currentWeight} -> ${right}` });
+            }
+
+            // Binary Search Loop
+            snap(11, "BS_WHILE_CHECK", { msg: `Checking while (left < right): ${left} < ${right}` });
+            while (left < right) {
+                mid = Math.floor(left + (right - left) / 2);
+                snap(12, "CALC_MID", { msg: `int mid = ${left} + (${right} - ${left}) / 2 = ${mid}` });
+
+                daysUsed = 1;
+                snap(14, "INIT_DAYS", { msg: "int daysUsed = 1;" });
+
+                capacity = 0;
+                snap(15, "INIT_CAP", { msg: "int capacity = 0;" });
+
+                currentShipIndex = 0;
+                shipLoads = [0];
+
+                // Simulation loop for testing capacity = mid
+                snap(17, "SIM_LOOP_START", { msg: `Testing Capacity ${mid} across packages` });
+                for (let i = 0; i < inputWeights.length; i++) {
+                    currentWeight = inputWeights[i];
+                    currentPkgIndex = i;
+
+                    snap(17, "SIM_PKG_INSPECT", { msg: `Evaluating package ${i+1} (weight ${currentWeight})` });
+
+                    snap(18, "CHECK_CAP_OVERFLOW", { msg: `Check if capacity + weight (${capacity} + ${currentWeight} = ${capacity + currentWeight}) > mid (${mid})` });
+                    if (capacity + currentWeight > mid) {
+                        daysUsed++;
+                        snap(19, "INC_DAYS", { msg: `Capacity exceeded! Ship ${currentShipIndex + 1} full. Adding new ship (daysUsed = ${daysUsed})` });
+
+                        capacity = 0;
+                        snap(20, "RESET_CAP", { msg: "Reset current ship capacity to 0" });
+
+                        currentShipIndex++;
+                        shipLoads.push(0);
+                    }
+
+                    capacity += currentWeight;
+                    shipLoads[currentShipIndex] = capacity;
+                    snap(23, "LOAD_PACKAGE", { 
+                        msg: `Loaded package ${i+1} (weight ${currentWeight}) onto Ship ${currentShipIndex + 1}. Ship Load = ${capacity}/${mid}`,
+                        loadedPkg: i,
+                        shipIdx: currentShipIndex
+                    });
+                }
+
+                // Check Binary Search Result for mid
+                snap(26, "CHECK_BS_SUCCESS", { msg: `Check if daysUsed (${daysUsed}) <= days (${inputDays})` });
+                if (daysUsed <= inputDays) {
+                    right = mid;
+                    snap(27, "BS_RIGHT_MOVE", { msg: `Capacity ${mid} SUCCEEDED (${daysUsed} <= ${inputDays} days). Move right boundary to mid (${mid})` });
+                } else {
+                    left = mid + 1;
+                    snap(29, "BS_LEFT_MOVE", { msg: `Capacity ${mid} FAILED (${daysUsed} > ${inputDays} days). Increase min capacity: left = mid + 1 (${left})` });
+                }
+
+                snap(11, "BS_WHILE_CHECK", { msg: `Checking while (left < right): ${left} < ${right}` });
+            }
+
+            snap(33, "RETURN_RESULT", { msg: `Binary Search Concluded. Minimum Capacity Required = ${left}` });
+            return steps;
+        }
+
+        // ====================================================================
+        // 3. THREE.JS 3D SCENE & GRAPHICS SYSTEM
+        // ====================================================================
+        const canvasContainer = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f3f8);
+        scene.fog = new THREE.FogExp2(0xf0f3f8, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(36, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+        camera.position.set(0, 16, 32);
+        camera.lookAt(0, -1, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        canvasContainer.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.position.set(20, 30, 15);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 80;
+        sunLight.shadow.camera.left = -25;
+        sunLight.shadow.camera.right = 25;
+        sunLight.shadow.camera.top = 20;
+        sunLight.shadow.camera.bottom = -20;
+        scene.add(sunLight);
+
+        const fillLight = new THREE.PointLight(0x0066ff, 0.8, 40);
+        fillLight.position.set(-15, 10, -5);
+        scene.add(fillLight);
+
+        // --- Environment Mesh (Water & Ocean Base) ---
+        const waterGeo = new THREE.PlaneGeometry(120, 120);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0xcbe2f7,
+            roughness: 0.1,
+            metalness: 0.8,
+            transparent: true,
+            opacity: 0.85
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -3.2;
+        water.receiveShadow = true;
+        scene.add(water);
+
+        // --- Conveyor Belt Platform ---
+        const beltGeo = new THREE.BoxGeometry(28, 0.5, 3.2);
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 });
+        const belt = new THREE.Mesh(beltGeo, beltMat);
+        belt.position.set(0, -2.0, -4);
+        belt.receiveShadow = true;
+        belt.castShadow = true;
+        scene.add(belt);
+
+        // Belt Side Rails
+        const railGeo = new THREE.BoxGeometry(28.2, 0.15, 0.15);
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x0066ff, roughness: 0.2 });
+        const r1 = new THREE.Mesh(railGeo, railMat);
+        r1.position.set(0, -1.7, -2.4);
+        scene.add(r1);
+        const r2 = r1.clone();
+        r2.position.set(0, -1.7, -5.6);
+        scene.add(r2);
+
+        // --- Procedural Striped Sphere Texture for Packages ---
+        function generateStripedPackageTexture(numberText) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            // Silver metallic background
+            let grad = ctx.createLinearGradient(0, 0, 512, 512);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(0.5, '#e2e8f0');
+            grad.addColorStop(1, '#94a3b8');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // Blue Glossy Stripes
+            ctx.fillStyle = '#0066ff';
+            const stripeWidth = 45;
+            const gap = 90;
+            for (let x = -512; x < 1024; x += gap) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x + stripeWidth, 0);
+                ctx.lineTo(x + stripeWidth - 250, 512);
+                ctx.lineTo(x - 250, 512);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Draw Weight Number Badge
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(256, 256, 90, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = '#0066ff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 110px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(numberText.toString(), 256, 260);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            return tex;
+        }
+
+        // Shared Metallic Cargo Ship Mesh Generator
+        function createMetallicCargoShipMesh() {
+            const shipGroup = new THREE.Group();
+
+            // Hull
+            const hullShape = new THREE.Shape();
+            hullShape.moveTo(-3.5, -1.0);
+            hullShape.lineTo(3.0, -1.0);
+            hullShape.lineTo(4.2, 0.8);
+            hullShape.lineTo(-3.8, 0.8);
+            hullShape.closePath();
+
+            const extrudeSettings = { depth: 2.2, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.2, bevelThickness: 0.2 };
+            const hullGeo = new THREE.ExtrudeGeometry(hullShape, extrudeSettings);
+            hullGeo.center();
+
+            const hullMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            const hull = new THREE.Mesh(hullGeo, hullMat);
+            hull.castShadow = true;
+            hull.receiveShadow = true;
+            shipGroup.add(hull);
+
+            // Ship Blue Trim Deck
+            const deckGeo = new THREE.BoxGeometry(7.2, 0.2, 2.3);
+            const deckMat = new THREE.MeshStandardMaterial({ color: 0x0066ff, roughness: 0.2 });
+            const deck = new THREE.Mesh(deckGeo, deckMat);
+            deck.position.set(0, 0.5, 0);
+            shipGroup.add(deck);
+
+            // Cabin / Bridge
+            const cabinGeo = new THREE.BoxGeometry(1.2, 1.4, 1.8);
+            const cabinMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+            cabin.position.set(-2.6, 1.2, 0);
+            cabin.castShadow = true;
+            shipGroup.add(cabin);
+
+            return shipGroup;
+        }
+
+        // Dynamic 3D Objects Manager
+        let packageMeshes = [];
+        let shipMeshes = [];
+
+        function rebuild3DWorld(inputWeights) {
+            // Clear existing packages
+            packageMeshes.forEach(p => scene.remove(p));
+            packageMeshes = [];
+
+            // Clear existing ships
+            shipMeshes.forEach(s => scene.remove(s));
+            shipMeshes = [];
+
+            // Build Package Balls on Conveyor Belt
+            const totalPkgs = inputWeights.length;
+            const startX = -11;
+            const stepX = Math.min(22 / Math.max(totalPkgs - 1, 1), 2.2);
+
+            inputWeights.forEach((w, idx) => {
+                const radius = 0.5 + (w * 0.02);
+                const geo = new THREE.SphereGeometry(radius, 48, 48);
+                const tex = generateStripedPackageTexture(w);
+                const mat = new THREE.MeshPhysicalMaterial({
+                    map: tex,
+                    roughness: 0.15,
+                    metalness: 0.2,
+                    clearcoat: 1.0,
+                    clearcoatRoughness: 0.1
+                });
+
+                const ball = new THREE.Mesh(geo, mat);
+                ball.castShadow = true;
+                ball.receiveShadow = true;
+
+                const defaultX = startX + idx * stepX;
+                const defaultY = -2.0 + 0.25 + radius;
+                const defaultZ = -4.0;
+
+                ball.userData = {
+                    id: idx,
+                    weight: w,
+                    radius: radius,
+                    beltPos: new THREE.Vector3(defaultX, defaultY, defaultZ)
+                };
+
+                ball.position.copy(ball.userData.beltPos);
+                scene.add(ball);
+                packageMeshes.push(ball);
+            });
+
+            // Pre-create Cargo Ships docked along front waterway
+            const maxPossibleShips = inputWeights.length;
+            const shipStartX = -10;
+            const shipStepX = 7.5;
+
+            for (let i = 0; i < Math.min(maxPossibleShips, 6); i++) {
+                const ship = createMetallicCargoShipMesh();
+                const shipX = shipStartX + i * shipStepX;
+                const shipY = -2.8;
+                const shipZ = 3.5;
+
+                ship.position.set(shipX, shipY, shipZ);
+                ship.userData = {
+                    index: i,
+                    basePos: new THREE.Vector3(shipX, shipY, shipZ),
+                    cargoCount: 0,
+                    currentLoad: 0
+                };
+
+                scene.add(ship);
+                shipMeshes.push(ship);
+            }
+        }
+
+        // ====================================================================
+        // 4. ANIMATION SYNCHRONIZER (CODE EXECUTION -> 3D WORLD)
+        // ====================================================================
+        let currentAnimationSpeed = 1.0;
+
+        function applyStepToVisualization(step) {
+            const { vars, line, action, shipLoads, loadedPkg, shipIdx, msg } = step;
+
+            // 1. Code Editor Line Highlight
+            highlightCodeLine(line);
+
+            // 2. Update HUD & Variable Cards
+            document.getElementById('var-left').innerText = vars.left;
+            document.getElementById('var-right').innerText = vars.right;
+            document.getElementById('var-mid').innerText = vars.mid;
+            document.getElementById('var-daysUsed').innerText = vars.daysUsed;
+            document.getElementById('var-capacity').innerText = vars.capacity;
+            document.getElementById('var-weight').innerText = vars.currentWeight || '-';
+
+            document.getElementById('hud-days').innerText = targetDays;
+            document.getElementById('hud-cap').innerText = vars.mid > 0 ? vars.mid : '-';
+            document.getElementById('hud-days-used').innerText = vars.daysUsed;
+            document.getElementById('hud-load').innerText = `${vars.capacity} / ${vars.mid > 0 ? vars.mid : '-'}`;
+            document.getElementById('bs-status-text').innerText = msg;
+
+            // 3. Update Binary Search Visual Pin Bar
+            const minW = Math.max(...weights);
+            const sumW = weights.reduce((a,b)=>a+b, 0);
+            const range = Math.max(sumW - minW, 1);
+
+            const leftPct = Math.max(0, Math.min(100, ((vars.left - minW) / range) * 100));
+            const rightPct = Math.max(0, Math.min(100, ((vars.right - minW) / range) * 100));
+            const midPct = vars.mid > 0 ? Math.max(0, Math.min(100, ((vars.mid - minW) / range) * 100)) : (leftPct + rightPct) / 2;
+
+            document.getElementById('pin-left').style.left = `${leftPct}%`;
+            document.getElementById('pin-left').innerText = `L:${vars.left}`;
+            document.getElementById('pin-right').style.left = `${rightPct}%`;
+            document.getElementById('pin-right').innerText = `R:${vars.right}`;
+            document.getElementById('pin-mid').style.left = `${midPct}%`;
+            document.getElementById('pin-mid').innerText = `MID:${vars.mid}`;
+
+            const seg = document.getElementById('bs-segment');
+            seg.style.left = `${leftPct}%`;
+            seg.style.width = `${Math.max(rightPct - leftPct, 0)}%`;
+
+            // 4. Update 3D Ships Cargo Sink Depth & Highlight
+            shipMeshes.forEach((ship, sIdx) => {
+                const load = shipLoads[sIdx] || 0;
+                const capacityCap = vars.mid > 0 ? vars.mid : 15;
+                const loadRatio = Math.min(load / capacityCap, 1.0);
+
+                // Sink ship realistic lower in water as cargo load increases
+                const targetY = ship.userData.basePos.y - (loadRatio * 0.4);
+                
+                new TWEEN.Tween(ship.position)
+                    .to({ y: targetY }, 400 / currentAnimationSpeed)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+            });
+
+            // 5. Animate Package Load onto Ship if action is LOAD_PACKAGE
+            if (action === "LOAD_PACKAGE" && loadedPkg !== undefined && packageMeshes[loadedPkg]) {
+                const ball = packageMeshes[loadedPkg];
+                const ship = shipMeshes[shipIdx];
+
+                if (ship) {
+                    // Calculate target spot on ship deck
+                    const offsetIndex = (ship.userData.cargoCount || 0) % 5;
+                    const targetX = ship.position.x - 1.8 + (offsetIndex * 0.9);
+                    const targetY = ship.position.y + 1.2;
+                    const targetZ = ship.position.z;
+
+                    ship.userData.cargoCount = (ship.userData.cargoCount || 0) + 1;
+
+                    // Parabolic arc path onto ship
+                    const midY = Math.max(ball.position.y, targetY) + 3.0;
+
+                    new TWEEN.Tween(ball.position)
+                        .to({ x: targetX, z: targetZ }, 500 / currentAnimationSpeed)
+                        .easing(TWEEN.Easing.Quadratic.Out)
+                        .start();
+
+                    new TWEEN.Tween(ball.position)
+                        .to({ y: midY }, 250 / currentAnimationSpeed)
+                        .easing(TWEEN.Easing.Quadratic.Out)
+                        .chain(
+                            new TWEEN.Tween(ball.position)
+                                .to({ y: targetY }, 250 / currentAnimationSpeed)
+                                .easing(TWEEN.Easing.Bounce.Out)
+                        )
+                        .start();
+
+                    new TWEEN.Tween(ball.rotation)
+                        .to({ x: ball.rotation.x + Math.PI * 2 }, 500 / currentAnimationSpeed)
+                        .start();
+                }
+            } else if (action === "CALC_MID" || action === "INIT") {
+                // Reset package positions back to conveyor belt for fresh iteration
+                packageMeshes.forEach(ball => {
+                    new TWEEN.Tween(ball.position)
+                        .to({ x: ball.userData.beltPos.x, y: ball.userData.beltPos.y, z: ball.userData.beltPos.z }, 400 / currentAnimationSpeed)
+                        .easing(TWEEN.Easing.Cubic.Out)
+                        .start();
+                });
+                shipMeshes.forEach(s => { s.userData.cargoCount = 0; });
+            }
+        }
+
+        // ====================================================================
+        // 5. PLAYBACK CONTROLS & INTERACTION ENGINE
+        // ====================================================================
+        let isPlaying = false;
+        let playIntervalTimer = null;
+
+        function runStep(index) {
+            if (index < 0 || index >= executionSteps.length) return;
+            currentStepIndex = index;
+            applyStepToVisualization(executionSteps[currentStepIndex]);
+        }
+
+        function stopAutoPlay() {
+            isPlaying = false;
+            clearInterval(playIntervalTimer);
+            document.getElementById('play-text').innerText = "Play";
+            document.getElementById('play-icon').setAttribute('points', '5 3 19 12 5 21 5 3');
+        }
+
+        function startAutoPlay() {
+            isPlaying = true;
+            document.getElementById('play-text').innerText = "Pause";
+            document.getElementById('play-icon').setAttribute('points', '6 4 10 4 10 20 6 20');
+
+            playIntervalTimer = setInterval(() => {
+                if (currentStepIndex < executionSteps.length - 1) {
+                    runStep(currentStepIndex + 1);
+                } else {
+                    stopAutoPlay();
+                }
+            }, 1200 / currentAnimationSpeed);
+        }
+
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (isPlaying) stopAutoPlay();
+            else {
+                if (currentStepIndex >= executionSteps.length - 1) currentStepIndex = 0;
+                startAutoPlay();
+            }
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            stopAutoPlay();
+            if (currentStepIndex < executionSteps.length - 1) runStep(currentStepIndex + 1);
+        });
+
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            stopAutoPlay();
+            if (currentStepIndex > 0) runStep(currentStepIndex - 1);
+        });
+
+        document.getElementById('btn-next-iter').addEventListener('click', () => {
+            stopAutoPlay();
+            // Jump to next loop iteration step
+            let idx = currentStepIndex + 1;
+            while (idx < executionSteps.length && 
+                   executionSteps[idx].action !== "SIM_PKG_INSPECT" && 
+                   executionSteps[idx].action !== "BS_WHILE_CHECK") {
+                idx++;
+            }
+            if (idx < executionSteps.length) runStep(idx);
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            stopAutoPlay();
+            rebuildSimulation();
+        });
+
+        document.getElementById('speed-range').addEventListener('input', (e) => {
+            currentAnimationSpeed = parseFloat(e.target.value);
+            if (isPlaying) {
+                stopAutoPlay();
+                startAutoPlay();
+            }
+        });
+
+        // Toggle Stream Mode UI
+        let streamModeActive = false;
+        document.getElementById('btn-stream-mode').addEventListener('click', () => {
+            streamModeActive = !streamModeActive;
+            const sidebar = document.getElementById('code-sidebar');
+            const drawer = document.getElementById('input-drawer');
+            const btnText = document.getElementById('stream-btn-text');
+
+            if (streamModeActive) {
+                sidebar.classList.add('hidden');
+                drawer.style.display = 'none';
+                btnText.innerText = "Normal Mode";
+            } else {
+                sidebar.classList.remove('hidden');
+                drawer.style.display = 'flex';
+                btnText.innerText = "Stream Mode";
+            }
+            setTimeout(() => {
+                camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            }, 300);
+        });
+
+        // ====================================================================
+        // 6. DYNAMIC INPUT CUSTOMIZER & CHIPS
+        // ====================================================================
+        function renderInputChips() {
+            const container = document.getElementById('package-chips');
+            container.innerHTML = '';
+
+            weights.forEach((w, idx) => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `
+                    <span>#${idx+1}: <b>${w}</b></span>
+                    <span class="chip-remove" data-idx="${idx}">&times;</span>
+                `;
+                container.appendChild(chip);
+            });
+
+            container.querySelectorAll('.chip-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    if (weights.length > 1) {
+                        weights.splice(idx, 1);
+                        rebuildSimulation();
+                    }
+                });
+            });
+        }
+
+        document.getElementById('btn-add-pkg').addEventListener('click', () => {
+            if (weights.length < 12) {
+                const newWeight = Math.floor(Math.random() * 8) + 1;
+                weights.push(newWeight);
+                rebuildSimulation();
+            }
+        });
+
+        document.getElementById('input-days').addEventListener('change', (e) => {
+            let val = parseInt(e.target.value) || 5;
+            targetDays = Math.max(1, Math.min(val, weights.length));
+            e.target.value = targetDays;
+            rebuildSimulation();
+        });
+
+        function rebuildSimulation() {
+            renderInputChips();
+            rebuild3DWorld(weights);
+            executionSteps = recordExecutionSteps(weights, targetDays);
+            currentStepIndex = 0;
+            runStep(0);
+        }
+
+        // Mouse Hover Tooltips
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / canvasContainer.clientWidth) * 2 - 1;
+            mouse.y = -(e.clientY / canvasContainer.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(packageMeshes);
+
+            if (intersects.length > 0) {
+                const ball = intersects[0].object;
+                tooltip.style.opacity = '1';
+                tooltip.style.left = `${e.clientX + 10}px`;
+                tooltip.style.top = `${e.clientY + 10}px`;
+                tooltip.innerText = `Package #${ball.userData.id + 1} | Weight: ${ball.userData.weight}`;
+            } else {
+                tooltip.style.opacity = '0';
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        });
+
+        // Initialize Application
+        rebuildSimulation();
+
+        // Main Render Loop
+        const clock = new THREE.Clock();
+        function renderLoop() {
+            requestAnimationFrame(renderLoop);
+            TWEEN.update();
+
+            const time = clock.getElapsedTime();
+            // Gentle ocean bobbing for ships
+            shipMeshes.forEach((ship, idx) => {
+                ship.position.z = ship.userData.basePos.z + Math.sin(time * 1.5 + idx) * 0.05;
+                ship.rotation.z = Math.sin(time * 1.2 + idx) * 0.02;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        renderLoop();
+    </script>
+</body>
+</html>
